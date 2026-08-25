@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Road Damage Detection</title>
+  <style>
+    :root {
+      --ink: #17211b;
+      --muted: #68746c;
+      --paper: #f5f6f1;
+      --panel: #ffffff;
+      --green: #236b4b;
+      --green-dark: #174833;
+      --line: #dfe5dd;
+      --danger: #a34332;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 90% 0%, #dcebdd 0, transparent 34%),
+        var(--paper);
+      font-family: Georgia, "Times New Roman", serif;
+    }
+
+    header {
+      padding: 42px 7vw 28px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--green);
+      font: 700 0.75rem/1.2 Arial, sans-serif;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 700px;
+      margin: 0;
+      font-size: clamp(2.4rem, 6vw, 5.2rem);
+      line-height: 0.95;
+      font-weight: 500;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.5fr);
+      gap: 28px;
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 42px 7vw 70px;
+    }
+
+    .panel {
+      padding: 26px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 16px 40px rgba(35, 61, 44, 0.06);
+    }
+
+    .upload-zone {
+      display: grid;
+      min-height: 220px;
+      place-items: center;
+      padding: 24px;
+      text-align: center;
+      border: 2px dashed #b9cbbd;
+      border-radius: 6px;
+      background: #f8faf6;
+      cursor: pointer;
+    }
+
+    .upload-zone:hover {
+      border-color: var(--green);
+      background: #f1f7f1;
+    }
+
+    .upload-zone input {
+      display: none;
+    }
+
+    .upload-title {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--green-dark);
+      font-size: 1.35rem;
+    }
+
+    .upload-note,
+    .status {
+      color: var(--muted);
+      font: 0.9rem/1.5 Arial, sans-serif;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 18px;
+      padding: 14px 18px;
+      color: white;
+      background: var(--green);
+      border: 0;
+      border-radius: 5px;
+      font: 700 0.9rem Arial, sans-serif;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: var(--green-dark);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: wait;
+    }
+
+    .preview {
+      display: none;
+      width: 100%;
+      max-height: 520px;
+      object-fit: contain;
+      background: #edf1eb;
+      border-radius: 5px;
+    }
+
+    .result-panel {
+      min-width: 0;
+    }
+
+    .result-panel h2 {
+      margin: 0 0 20px;
+      font-size: 1.8rem;
+      font-weight: 500;
+    }
+
+    #resultImage:not([src]) {
+      display: none;
+    }
+
+    .empty {
+      display: grid;
+      min-height: 420px;
+      place-items: center;
+      color: var(--muted);
+      background: #f8faf6;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      font: 0.95rem Arial, sans-serif;
+    }
+
+    .detections {
+      display: grid;
+      gap: 8px;
+      margin-top: 20px;
+    }
+
+    .detection {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 14px;
+      border-left: 4px solid var(--green);
+      background: #f1f6f0;
+      font: 0.9rem Arial, sans-serif;
+    }
+
+    .error {
+      color: var(--danger);
+    }
+
+    @media (max-width: 800px) {
+      main {
+        grid-template-columns: 1fr;
+        padding-top: 28px;
+      }
+
+      header {
+        padding-top: 30px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <p class="eyebrow">Computer vision / field inspection</p>
+    <h1>Road damage detection</h1>
+  </header>
+
+  <main>
+    <section class="panel">
+      <label class="upload-zone" for="imageInput">
+        <span>
+          <span class="upload-title">Choose a road image</span>
+          <span class="upload-note">JPG, PNG, BMP, or WebP</span>
+        </span>
+        <input id="imageInput" type="file" accept="image/*">
+      </label>
+
+      <img id="previewImage" class="preview" alt="Selected image preview">
+      <button id="predictButton" type="button" disabled>Analyze image</button>
+      <p id="status" class="status">Select an image to begin.</p>
+    </section>
+
+    <section class="panel result-panel">
+      <h2>Inspection result</h2>
+      <div id="emptyState" class="empty">Your annotated image will appear here.</div>
+      <img id="resultImage" class="preview" alt="Annotated prediction result">
+      <div id="detections" class="detections"></div>
+    </section>
+  </main>
+
+  <script>
+    const input = document.querySelector("#imageInput");
+    const preview = document.querySelector("#previewImage");
+    const resultImage = document.querySelector("#resultImage");
+    const button = document.querySelector("#predictButton");
+    const status = document.querySelector("#status");
+    const emptyState = document.querySelector("#emptyState");
+    const detections = document.querySelector("#detections");
+
+    input.addEventListener("change", () => {
+      const file = input.files[0];
+      if (!file) return;
+
+      preview.src = URL.createObjectURL(file);
+      preview.style.display = "block";
+      button.disabled = false;
+      status.textContent = file.name;
+      resultImage.removeAttribute("src");
+      resultImage.style.display = "none";
+      emptyState.style.display = "grid";
+      detections.replaceChildren();
+    });
+
+    button.addEventListener("click", async () => {
+      const file = input.files[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      button.disabled = true;
+      status.textContent = "Analyzing image...";
+      status.classList.remove("error");
+
+      try {
+        const response = await fetch("/predict", {
+          method: "POST",
+          body: formData
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.detail || "Prediction failed");
+        }
+
+        resultImage.src = data.image;
+        resultImage.style.display = "block";
+        emptyState.style.display = "none";
+
+        detections.innerHTML = data.detections.length
+          ? data.detections.map(item => `
+              <div class="detection">
+                <strong>${item.class}</strong>
+                <span>${Math.round(item.confidence * 100)}% confidence</span>
+              </div>
+            `).join("")
+          : "<p class='status'>No damage detected.</p>";
+
+        status.textContent = `${data.detections.length} detection(s) found.`;
+      } catch (error) {
+        status.textContent = error.message;
+        status.classList.add("error");
+      } finally {
+        button.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
